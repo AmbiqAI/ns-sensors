@@ -36,30 +36,6 @@
 #define INA228_REG_MFG_VAL 0x5449
 #define INA228_REG_DVC_VAL 0x228
 
-uint32_t
-ina228_initialize(ina228_context_t *ctx)
-{
-    ctx->_shunt_res = 0.1;
-    ctx->_current_lsb = 0.0001;
-    // Validate the device?
-}
-
-uint32_t
-ina228_validate(ina228_context_t *ctx)
-{
-    uint16_t value;
-    uint32_t rst;
-    rst = ina228_read_register(ctx, INA228_REG_MFG_UID, &value, 0xFFFF);
-    if (value != INA228_REG_MFG_VAL) {
-        return 1;
-    }
-    rst = ina228_read_register(ctx, INA228_REG_DVC_UID, &value, 0xFFFF);
-    if (value != INA228_REG_DVC_VAL) {
-        return 1;
-    }
-    return 0;
-}
-
 static uint32_t
 ina228_read_register(ina228_context_t *ctx, uint8_t reg, uint16_t *value, uint16_t mask)
 {
@@ -74,7 +50,7 @@ ina228_read_register(ina228_context_t *ctx, uint8_t reg, uint16_t *value, uint16
     return rst;
 }
 
-static uin32_t
+static uint32_t
 ina228_read_register_24(ina228_context_t *ctx, uint8_t reg, uint32_t *value)
 {
     uint8_t i2cBuffer[3];
@@ -97,18 +73,6 @@ ina228_read_bits(ina228_context_t *ctx, uint8_t reg, uint16_t *value, uint16_t l
 }
 
 static uint32_t
-ina228_write_bits(ina228_context_t *ctx, uint8_t reg, uint16_t value, uint16_t len, uint16_t offset)
-{
-    uint16_t mask = (1 << len) - 1;
-    uint16_t regValue;
-    uint32_t rst;
-    rst = ina228_read_register(ctx, reg, &regValue, 0xFFFF);
-    regValue &= ~(mask << offset);
-    regValue |= (value & mask) << offset;
-    return ina228_write_register(ctx, reg, regValue, 0xFFFF);
-}
-
-static uin32_t
 ina228_write_register(ina228_context_t *ctx, uint8_t reg, uint16_t value, uint16_t mask)
 {
     uint16_t rdValue;
@@ -120,27 +84,78 @@ ina228_write_register(ina228_context_t *ctx, uint8_t reg, uint16_t value, uint16
     }
     i2cBuffer[1] = (value >> 8) & 0xFF;
     i2cBuffer[2] = value & 0xFF;
-    return ctx->i2c_write(&(i2cBuffer[0]), 3, ctx->addr);
+    return ctx->i2c_write(i2cBuffer, 3, ctx->addr);
+}
+
+static uint32_t
+ina228_write_bits(ina228_context_t *ctx, uint8_t reg, uint16_t value, uint16_t len, uint16_t offset)
+{
+    uint16_t mask = (1 << len) - 1;
+    uint16_t regValue;
+    uint32_t rst;
+    rst = ina228_read_register(ctx, reg, &regValue, 0xFFFF);
+    regValue &= ~(mask << offset);
+    regValue |= (value & mask) << offset;
+    rst = ina228_write_register(ctx, reg, regValue, 0xFFFF);
+    return rst;
+}
+
+
+uint32_t
+ina228_initialize(ina228_context_t *ctx)
+{
+    ctx->_shunt_res = 0.1;
+    ctx->_current_lsb = 0.0001;
+    // Validate the device?
+    return 0;
+}
+
+uint32_t
+ina228_get_manufacturer_id(ina228_context_t *ctx, uint16_t *value)
+{
+    return ina228_read_register(ctx, INA228_REG_MFG_UID, value, 0xFFFF);
+}
+
+uint32_t
+ina228_get_device_id(ina228_context_t *ctx, uint16_t *value)
+{
+    return ina228_read_register(ctx, INA228_REG_DVC_UID, value, 0xFFFF);
+}
+
+uint32_t
+ina228_validate(ina228_context_t *ctx)
+{
+    uint16_t value;
+    uint32_t rst;
+    rst = ina228_get_manufacturer_id(ctx, &value);
+    if (value != INA228_REG_MFG_VAL) {
+        return 1;
+    }
+    rst = ina228_get_device_id(ctx, &value);
+    if (value != INA228_REG_DVC_VAL) {
+        return 1;
+    }
+    return rst;
 }
 
 
 uint32_t
 ina228_reset(ina228_context_t *ctx)
 {
-    return ina228_write_register(ctx, INA228_REG_CONFIG, 0xC000, 0xC000);
+    return ina228_write_bits(ctx, INA228_REG_CONFIG, 1, 1, 15);
 }
 
 
 uint32_t
 ina228_reset_accumulators(ina228_context_t *ctx)
 {
-    return ina228_write_register(ctx, INA228_REG_CONFIG, 0x4000, 0x4000);
+    return ina228_write_bits(ctx, INA228_REG_CONFIG, 1, 1, 14);
 }
 
 uint32_t
 ina228_set_shunt(ina228_context_t *ctx,  float32_t shunt_res, float32_t max_current)
 {
-    uint8_t scale;
+    uint16_t scale;
     ina228_get_adc_range(ctx, &scale);
 
     ctx->_shunt_res = shunt_res;
@@ -169,7 +184,7 @@ ina228_read_die_temp(ina228_context_t *ctx, float32_t *temp)
     int16_t value;
     uint32_t rst;
     rst = ina228_read_register(ctx, INA228_REG_DIETEMP, &uvalue, 0xFFFF);
-    // Coerce to signed
+    // Coerce to signed, 7.8125 m°C/LSB, convert to °C
     value = (int16_t)uvalue;
     *temp = (float32_t)value * 7.8125 / 1000.0;
     return rst;
@@ -180,12 +195,16 @@ ina228_read_current(ina228_context_t *ctx, float32_t *current)
 {
 
     uint32_t rst;
+    uint32_t uvalue;
     int32_t value;
-    rst = ina228_read_register_24(ctx, INA228_REG_CURRENT, &value);
+    rst = ina228_read_register_24(ctx, INA228_REG_CURRENT, &uvalue);
+    value = (int32_t)uvalue;
     if (value & 0x800000) {
         value |= 0xFF000000;
     }
+    // /16 is because last 4 bits are dont care, convert to mA
     *current = (float32_t)value / 16.0 * ctx->_current_lsb * 1000.0;
+    return rst;
 }
 
 
@@ -195,25 +214,28 @@ ina228_read_bus_voltage(ina228_context_t *ctx, float32_t *bus_voltage)
     uint32_t rst;
     uint32_t value;
     rst = ina228_read_register_24(ctx, INA228_REG_VBUS, &value);
-    // Never negative
+    // Never negative, 195.3125 µV/LSB, convert to mV
     *bus_voltage = (float32_t)((uint32_t)value >> 4) * 195.3125 / 1000.0;
+    return rst;
 }
 
 uint32_t
 ina228_read_shunt_voltage(ina228_context_t *ctx, float32_t *shunt_voltage)
 {
     uint32_t rst;
-    uint8_t value8;
+    uint16_t value16;
     int32_t value;
 
-    rst = ina228_get_adc_range(ctx, &value8);
-    float32_t scale = value8 ? 78.125 : 312.5;
+    rst = ina228_get_adc_range(ctx, &value16);
+    float32_t scale = value16 ? 78.125 : 312.5;
 
     rst = ina228_read_register_24(ctx, INA228_REG_VSHUNT, &value);
     if (value & 0x800000) {
         value |= 0xFF000000;
     }
-
+    // 78.125 nV/LSB if adc is 1 else 312.5 nV/LSB
+    // /16 is because last 4 bits are dont care
+    // Convert to mV
     *shunt_voltage = (float32_t)value / 16.0 * scale / 1000000.0;
     return rst;
 }
@@ -224,7 +246,8 @@ ina228_read_power(ina228_context_t *ctx, float32_t *power)
     uint32_t rst;
     uint32_t value;
     rst = ina228_read_register_24(ctx, INA228_REG_POWER, &value);
-    *power = (float32_t)value * 3.2 * _current_lsb * 1000;
+    // Never negative, 3.2*current_lsb convert to mW
+    *power = (float32_t)value * 3.2 * ctx->_current_lsb * 1000;
     return rst;
 }
 
@@ -240,6 +263,22 @@ ina228_read_energy(ina228_context_t *ctx, float32_t *energy) {
         e += buff[i];
     }
     *energy = e * 16 * 3.2 * ctx->_current_lsb;
+    return rst;
+}
+
+uint32_t
+ina228_read_charge(ina228_context_t *ctx, float32_t *charge)
+{
+    uint32_t rst;
+    uint8_t buff[5];
+    buff[0] = INA228_REG_CHARGE;
+    rst = ctx->i2c_write_read(ctx->addr, buff, 1, buff, 5);
+    float32_t e = 0;
+    for (int i = 0; i < 5; i++) {
+        e *= 256;
+        e += buff[i];
+    }
+    *charge = e * ctx->_current_lsb;
     return rst;
 }
 
@@ -260,12 +299,12 @@ ina228_get_mode(ina228_context_t *ctx, ina228_meas_mode_t *mode)
 }
 
 uint32_t
-ina228_conversion_ready(ina228_context_t *ctx, bool *ready)
+ina228_conversion_ready(ina228_context_t *ctx, uint8_t *ready)
 {
     uint16_t value;
     uint32_t rst;
     rst = ina228_read_bits(ctx, INA228_REG_DIAGALRT, &value, 1, 0);
-    *ready = value ? true : false;
+    *ready = value;
     return rst;
 }
 
@@ -276,6 +315,7 @@ ina228_alert_functions(ina228_context_t *ctx, uint16_t *functions)
     uint32_t rst;
     rst = ina228_read_bits(ctx, INA228_REG_DIAGALRT, &value, 12, 0);
     *functions = value;
+    return rst;
 }
 
 uint32_t
@@ -285,6 +325,7 @@ ina228_get_alert_latch(ina228_context_t *ctx, ina228_alert_latch_t *latch)
     uint32_t rst;
     rst = ina228_read_bits(ctx, INA228_REG_DIAGALRT, &value, 1, 15);
     *latch = value ? INA228_ALERT_LATCH_ENABLED : INA228_ALERT_LATCH_TRANSPARENT;
+    return rst;
 }
 
 uint32_t

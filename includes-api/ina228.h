@@ -150,6 +150,12 @@ uint32_t
 ina228_initialize(ina228_context_t *ctx);
 
 uint32_t
+ina228_get_manufacturer_id(ina228_context_t *ctx, uint16_t *value);
+
+uint32_t
+ina228_get_device_id(ina228_context_t *ctx, uint16_t *value);
+
+uint32_t
 ina228_reset(ina228_context_t *ctx);
 
 uint32_t
@@ -159,10 +165,10 @@ uint32_t
 ina228_set_shunt(ina228_context_t *ctx,  float shunt_res, float max_current);
 
 uint32_t
-ina228_set_adc_range(ina228_context_t *ctx, uint8_t adc_range);
+ina228_set_adc_range(ina228_context_t *ctx, uint16_t adc_range);
 
 uint32_t
-ina228_get_adc_range(ina228_context_t *ctx, uint8_t *adc_range);
+ina228_get_adc_range(ina228_context_t *ctx, uint16_t *adc_range);
 
 uint32_t
 ina228_read_die_temp(ina228_context_t *ctx, float *temp);
@@ -183,13 +189,16 @@ uint32_t
 ina228_read_energy(ina228_context_t *ctx, float *energy);
 
 uint32_t
+ina228_read_charge(ina228_context_t *ctx, float32_t *charge);
+
+uint32_t
 ina228_set_mode(ina228_context_t *ctx, ina228_meas_mode_t mode);
 
 uint32_t
 ina228_get_mode(ina228_context_t *ctx, ina228_meas_mode_t *mode);
 
 uint32_t
-ina228_conversion_ready(ina228_context_t *ctx, bool *ready);
+ina228_conversion_ready(ina228_context_t *ctx, uint8_t *ready);
 
 uint32_t
 ina228_alert_functions(ina228_context_t *ctx, uint16_t *functions);
