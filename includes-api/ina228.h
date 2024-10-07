@@ -9,6 +9,13 @@
  *
  */
 
+#ifndef __INA228_H
+#define __INA228_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "arm_math.h"
 
 typedef uint32_t (*pfnI2cWriteRead)(uint16_t addr, const void *write_buf, size_t num_write, void *read_buf, size_t num_read);
@@ -238,3 +245,9 @@ ina228_get_averaging_count(ina228_context_t *ctx, ina228_avg_count_t *count);
 
 uint32_t
 ina228_set_averaging_count(ina228_context_t *ctx, ina228_avg_count_t count);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // __INA228_H
