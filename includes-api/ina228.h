@@ -18,18 +18,18 @@ extern "C" {
 
 #include "arm_math.h"
 
-typedef uint32_t (*pfnI2cWriteRead)(uint16_t addr, const void *write_buf, size_t num_write, void *read_buf, size_t num_read);
-typedef uint32_t (*pfnI2cRead)(const void *buf, uint32_t num_bytes, uint16_t addr);
-typedef uint32_t (*pfnI2cWrite)(const void *buf, uint32_t num_bytes, uint16_t addr);
+typedef uint32_t (*ina228pfnI2cWriteRead)(uint16_t addr, const void *write_buf, size_t num_write, void *read_buf, size_t num_read);
+typedef uint32_t (*ina228pfnI2cRead)(const void *buf, uint32_t num_bytes, uint16_t addr);
+typedef uint32_t (*ina228pfnI2cWrite)(const void *buf, uint32_t num_bytes, uint16_t addr);
 
 
 typedef struct {
   uint32_t addr;
   float _shunt_res;
   float _current_lsb;
-  pfnI2cWriteRead i2c_write_read;
-  pfnI2cRead i2c_read;
-  pfnI2cWrite i2c_write;
+  ina228pfnI2cWriteRead i2c_write_read;
+  ina228pfnI2cRead i2c_read;
+  ina228pfnI2cWrite i2c_write;
 } ina228_context_t;
 
 
